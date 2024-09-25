@@ -4,8 +4,9 @@ const dotenv = require("dotenv").config();
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const http = require("http");
-const setupSocket = require("./socket");
+const WebSocketServer = require("websocket").server;
 
+let connection = null;
 const app = express();
 
 mongoose
@@ -20,10 +21,23 @@ app.use(express.urlencoded({ extended: false }));
 app.use("/", require("./routes/authRoutes"));
 
 const port = 8000;
-const server = http.createServer(app); // Create an HTTP server
+const server = http.createServer(app);
 
-setupSocket(server); // Set up WebSocket connections
+const websocket = new WebSocketServer({
+  httpServer: server,
+  // autoAcceptConnections: false
+});
 
-app.listen(port, () => {
+websocket.on("request", (request) => {
+  connection = request.accept(null, request.origin);
+  connection.on("open", () => console.log("Opened"));
+  connection.on("closed", () => console.log("Closed"));
+  connection.on("message", (message) => {
+    console.log(`Received message ${message.utf8Data}`);
+    connection.send(`Got your message: ${message.utf8Data}`);
+  });
+});
+
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
