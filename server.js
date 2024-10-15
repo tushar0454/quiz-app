@@ -4,39 +4,36 @@ const dotenv = require("dotenv").config();
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const http = require("http");
-const WebSocketServer = require("websocket").server;
+const { setupWebSocket } = require("./socket");
 
-let connection = null;
 const app = express();
 
+app.use(
+  cors({
+    credentials: true,
+    origin: "http://localhost:3000",
+  })
+);
+app.use(express.json());
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: false }));
+
+// MongoDB connection
 mongoose
   .connect(process.env.MONGO_URL)
   .then(() => console.log("Database connected"))
   .catch((err) => console.log("Database not connected"));
 
-app.use(express.json());
-app.use(cookieParser());
-app.use(express.urlencoded({ extended: false }));
-
+// Routes
 app.use("/", require("./routes/authRoutes"));
+app.use("/admin", require("./routes/adminRoutes"));
+app.use("/room", require("./routes/roomRoutes"));
 
-const port = 8000;
+// HTTP server
+const port = process.env.PORT || 8000;
 const server = http.createServer(app);
 
-const websocket = new WebSocketServer({
-  httpServer: server,
-  // autoAcceptConnections: false
-});
-
-websocket.on("request", (request) => {
-  connection = request.accept(null, request.origin);
-  connection.on("open", () => console.log("Opened"));
-  connection.on("closed", () => console.log("Closed"));
-  connection.on("message", (message) => {
-    console.log(`Received message ${message.utf8Data}`);
-    connection.send(`Got your message: ${message.utf8Data}`);
-  });
-});
+setupWebSocket(server);
 
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
